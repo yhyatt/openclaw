@@ -28,6 +28,7 @@ import { inheritOptionFromParent } from "../command-options.js";
 import { forceFreePortAndWait, waitForPortBindable } from "../ports.js";
 import { ensureDevGatewayConfig } from "./dev.js";
 import { runGatewayLoop } from "./run-loop.js";
+import { checkCrashLoopAndAbort } from "../../infra/crash-loop-sentinel.js";
 import {
   describeUnknownError,
   extractGatewayMiskeys,
@@ -161,6 +162,10 @@ function resolveGatewayRunOptions(opts: GatewayRunOpts, command?: Command): Gate
 }
 
 async function runGatewayCommand(opts: GatewayRunOpts) {
+  // Check for crash loop before any other startup work. Exits with code 78
+  // (EX_CONFIG) if 3+ starts in 60s are detected, preventing infinite restart loops.
+  await checkCrashLoopAndAbort();
+
   const isDevProfile = process.env.OPENCLAW_PROFILE?.trim().toLowerCase() === "dev";
   const devMode = Boolean(opts.dev) || isDevProfile;
   if (opts.reset && !devMode) {
